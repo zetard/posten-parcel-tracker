@@ -37,4 +37,4 @@ jobs:
           category: integration
           # This custom integration isn't registered in the home-assistant/brands
           # repository (that's for the default HACS store), so skip that check.
-          ignore: brands
+          ignore: brands issues topics
