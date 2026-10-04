@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Sequence
+import logging
 
 import aiohttp
 
@@ -13,6 +15,8 @@ from .auth import PostenAuth
 from .client import PostenClient
 from .const import CARRIER_NAME, PARCEL_LOOKBACK_DAYS
 from .parser import parse_parcels
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class PostenProvider(Provider):
@@ -36,7 +40,28 @@ class PostenProvider(Provider):
 
     async def async_get_parcels(self) -> Sequence[Parcel]:
         raw = await self._client.async_get_parcels_raw()
-        return parse_parcels(raw)
+        parsed = parse_parcels(raw)
+
+        raw_items = raw.get("parcels") if isinstance(raw, dict) else None
+        raw_items = raw_items if isinstance(raw_items, list) else []
+        raw_statuses = Counter(
+            str(item.get("status"))
+            for item in raw_items
+            if isinstance(item, dict) and item.get("status") is not None
+        )
+        normalized_statuses = Counter(parcel.status.value for parcel in parsed)
+        active_count = sum(1 for parcel in parsed if parcel.is_active)
+
+        _LOGGER.debug(
+            "Posten parcel diagnostics: raw_count=%d parsed_count=%d "
+            "active_count=%d raw_statuses=%s normalized_statuses=%s",
+            len(raw_items),
+            len(parsed),
+            active_count,
+            dict(raw_statuses),
+            dict(normalized_statuses),
+        )
+        return parsed
 
 
 __all__ = ["PostenProvider", "PostenAuth"]
